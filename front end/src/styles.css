@@ -1,0 +1,160 @@
+:root {
+  color: #eff7ff;
+  background: #04070d;
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 50% 30%, #1b2e5e 0%, rgba(8, 14, 35, 0.93) 42%, #03050a 100%),
+    linear-gradient(170deg, #070d1f 0%, #03060f 100%);
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.9rem;
+  padding: 1.5rem;
+  text-align: center;
+}
+
+.app-title {
+  margin: 0;
+  font-size: clamp(2rem, 4.5vw, 3rem);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.app-subtitle {
+  margin: 0 0 0.6rem 0;
+  color: rgba(232, 241, 255, 0.75);
+  max-width: 36rem;
+  font-size: 0.95rem;
+}
+
+.orb {
+  width: min(62vw, 280px);
+  aspect-ratio: 1;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  position: relative;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: transform 0.2s ease;
+}
+
+.orb:disabled {
+  cursor: wait;
+}
+
+.orb:hover {
+  transform: scale(1.02);
+}
+
+.orb-core {
+  width: 64%;
+  height: 64%;
+  border-radius: 999px;
+  background: radial-gradient(circle at 30% 30%, #f4fbff 0%, #8ac6ff 23%, #4768ff 62%, #2a2a6e 100%);
+  box-shadow:
+    0 0 22px rgba(122, 192, 255, 0.6),
+    0 0 76px rgba(86, 117, 255, 0.45);
+}
+
+.orb::before,
+.orb::after {
+  content: "";
+  position: absolute;
+  inset: 6%;
+  border-radius: 999px;
+  pointer-events: none;
+}
+
+.orb-idle::before {
+  background: radial-gradient(circle, rgba(99, 129, 230, 0.14), transparent 72%);
+}
+
+.orb-listening::before {
+  background: radial-gradient(circle, rgba(79, 198, 255, 0.38), rgba(87, 99, 255, 0.08) 60%, transparent 80%);
+  animation: breathe 2.1s ease-in-out infinite;
+}
+
+.orb-speaking::before {
+  background: radial-gradient(circle, rgba(111, 238, 255, 0.56), rgba(120, 83, 255, 0.23) 52%, transparent 78%);
+  animation: pulse-fast 0.58s ease-in-out infinite;
+}
+
+.orb-speaking::after {
+  inset: -4%;
+  border: 2px solid rgba(116, 229, 255, 0.52);
+  animation: ring 1.3s ease-out infinite;
+}
+
+.orb-error .orb-core {
+  background: radial-gradient(circle at 28% 28%, #ffd5d6 0%, #f37385 38%, #771024 100%);
+  box-shadow:
+    0 0 18px rgba(255, 116, 139, 0.65),
+    0 0 52px rgba(145, 17, 40, 0.4);
+}
+
+.status-text {
+  margin: 0.15rem 0 0 0;
+  font-size: 1rem;
+  color: rgba(236, 245, 255, 0.9);
+}
+
+.warning-text {
+  margin: 0;
+  color: #ffd4a2;
+  max-width: 32rem;
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    transform: scale(0.92);
+    opacity: 0.55;
+  }
+  50% {
+    transform: scale(1.02);
+    opacity: 1;
+  }
+}
+
+@keyframes pulse-fast {
+  0%,
+  100% {
+    transform: scale(0.94);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scale(1.06);
+    opacity: 1;
+  }
+}
+
+@keyframes ring {
+  0% {
+    transform: scale(0.84);
+    opacity: 0.62;
+  }
+  100% {
+    transform: scale(1.17);
+    opacity: 0;
+  }
+}

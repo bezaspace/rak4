@@ -1,0 +1,13 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+
+# Frontend
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Env
+.env
