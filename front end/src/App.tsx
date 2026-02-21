@@ -1,29 +1,41 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { BookingUpdates, type BookingUpdate } from "./components/BookingUpdates";
+import { DoctorRecommendations } from "./components/DoctorRecommendations";
 import { startMicCapture, type AudioInputController } from "./lib/audioIn";
 import { AudioPlayer } from "./lib/audioOut";
-import { LiveSocket } from "./lib/liveSocket";
+import { LiveSocket, type DoctorCard } from "./lib/liveSocket";
 
 type ConnectionState = "idle" | "connecting" | "ready" | "error";
-type VoiceVisualState = "idle" | "listening" | "speaking" | "error";
+type VoiceVisualState = "idle" | "listening" | "holding" | "awaiting" | "speaking" | "error";
 
 const wsUrl = import.meta.env.VITE_BACKEND_WS_URL ?? "ws://localhost:8000/ws/live";
 const appName = import.meta.env.VITE_APP_NAME ?? "Raksha";
-const BARGE_IN_RMS_THRESHOLD = 0.015;
-const BARGE_IN_CONSECUTIVE_CHUNKS = 2;
 
 export default function App() {
   const [state, setState] = useState<ConnectionState>("idle");
   const [warning, setWarning] = useState("");
   const [visualState, setVisualState] = useState<VoiceVisualState>("idle");
+  const [symptomsSummary, setSymptomsSummary] = useState("");
+  const [recommendedDoctors, setRecommendedDoctors] = useState<DoctorCard[]>([]);
+  const [bookingUpdates, setBookingUpdates] = useState<BookingUpdate[]>([]);
+  const [isPttActive, setIsPttActive] = useState(false);
 
   const socket = useMemo(() => new LiveSocket(), []);
   const playerRef = useRef<AudioPlayer | null>(null);
   const micRef = useRef<AudioInputController | null>(null);
   const assistantSampleRateRef = useRef<number>(24000);
   const speakingTimeoutRef = useRef<number | null>(null);
-  const isAssistantSpeakingRef = useRef(false);
-  const loudMicChunkCountRef = useRef(0);
+  const isPttActiveRef = useRef(false);
+  const pttSeqRef = useRef(0);
+
+  const logUi = (message: string, payload?: unknown) => {
+    if (payload === undefined) {
+      console.info(`[raksha.ui] ${message}`);
+      return;
+    }
+    console.info(`[raksha.ui] ${message}`, payload);
+  };
 
   useEffect(() => {
     return () => {
@@ -35,132 +47,203 @@ export default function App() {
 
   const setListeningVisual = () => {
     setVisualState("listening");
-    isAssistantSpeakingRef.current = false;
-  };
-
-  const markAssistantSpeaking = () => {
-    setVisualState("speaking");
-    isAssistantSpeakingRef.current = true;
   };
 
   const stopAssistantPlaybackNow = () => {
+    logUi("ASSISTANT_PLAYBACK_INTERRUPT");
     playerRef.current?.interruptNow();
     if (speakingTimeoutRef.current !== null) {
       window.clearTimeout(speakingTimeoutRef.current);
       speakingTimeoutRef.current = null;
     }
-    setListeningVisual();
+  };
+
+  const markPttActive = (active: boolean) => {
+    isPttActiveRef.current = active;
+    setIsPttActive(active);
   };
 
   const connect = async () => {
+    logUi("SESSION_CONNECT_START");
     setState("connecting");
     setVisualState("idle");
     setWarning("");
+    setSymptomsSummary("");
+    setRecommendedDoctors([]);
+    setBookingUpdates([]);
+    markPttActive(false);
 
     playerRef.current = new AudioPlayer();
     socket.connect(wsUrl, {
       onOpen: () => {
+        logUi("SESSION_READY");
         setState("ready");
         setListeningVisual();
       },
       onClose: () => {
+        logUi("SESSION_CLOSED");
         setState("idle");
         setVisualState("idle");
-        isAssistantSpeakingRef.current = false;
+        markPttActive(false);
       },
       onError: () => {
+        logUi("SESSION_ERROR");
         setWarning("Connection error. Check backend logs.");
         setState("error");
         setVisualState("error");
-        isAssistantSpeakingRef.current = false;
+        markPttActive(false);
       },
       onEvent: (evt) => {
-        if (evt.type === "assistant_audio_format" && evt.sampleRate) {
+        logUi("SERVER_EVENT", { type: evt.type });
+        if (evt.type === "session_ready") {
+          setState("ready");
+          setWarning("");
+          if (!isPttActiveRef.current) {
+            setListeningVisual();
+          }
+          return;
+        }
+        if (evt.type === "warning") {
+          setWarning(evt.message);
+          return;
+        }
+        if (evt.type === "fallback_started") {
+          setWarning("Recovering your previous request after live tool interruption...");
+          setVisualState("awaiting");
+          return;
+        }
+        if (evt.type === "fallback_completed") {
+          setWarning(
+            evt.result === "ok"
+              ? "Recovered your request. Reconnecting voice session..."
+              : "Could not recover automatically. Please repeat your request."
+          );
+          return;
+        }
+        if (evt.type === "session_recovering") {
+          setVisualState("awaiting");
+          return;
+        }
+        if (evt.type === "error") {
+          setWarning(evt.message);
+          return;
+        }
+        if (evt.type === "assistant_audio_format") {
           assistantSampleRateRef.current = evt.sampleRate;
         }
         if (evt.type === "assistant_interrupted") {
           stopAssistantPlaybackNow();
+          if (!isPttActiveRef.current) {
+            setVisualState("awaiting");
+          }
         }
-        if (evt.type === "warning") setWarning(evt.message ?? "");
+        if (evt.type === "doctor_recommendations") {
+          setSymptomsSummary(evt.symptomsSummary);
+          setRecommendedDoctors(evt.doctors);
+        }
+        if (evt.type === "booking_update") {
+          setBookingUpdates((prev) => [...prev, { status: evt.status, message: evt.message, booking: evt.booking }]);
+        }
       },
       onAudioChunk: (chunk) => {
+        logUi("AUDIO_RX_CHUNK", { bytes: chunk.byteLength });
         playerRef.current?.playPcm16Chunk(chunk, assistantSampleRateRef.current);
-        markAssistantSpeaking();
+        if (!isPttActiveRef.current) {
+          setVisualState("speaking");
+        }
         if (speakingTimeoutRef.current !== null) {
           window.clearTimeout(speakingTimeoutRef.current);
         }
         speakingTimeoutRef.current = window.setTimeout(() => {
-          setListeningVisual();
+          if (!isPttActiveRef.current) {
+            setListeningVisual();
+          }
           speakingTimeoutRef.current = null;
-        }, 380);
+        }, 280);
       },
     });
 
     try {
       micRef.current = await startMicCapture((chunk) => {
-        const pcm = new Int16Array(chunk);
-        let energy = 0;
-        for (let i = 0; i < pcm.length; i += 1) {
-          const sample = pcm[i] / 0x7fff;
-          energy += sample * sample;
-        }
-        const rms = Math.sqrt(energy / Math.max(1, pcm.length));
-        if (rms > BARGE_IN_RMS_THRESHOLD) {
-          loudMicChunkCountRef.current += 1;
-        } else {
-          loudMicChunkCountRef.current = 0;
-        }
-        if (
-          isAssistantSpeakingRef.current &&
-          loudMicChunkCountRef.current >= BARGE_IN_CONSECUTIVE_CHUNKS
-        ) {
-          stopAssistantPlaybackNow();
-          loudMicChunkCountRef.current = 0;
-        }
         socket.sendAudioChunk(chunk);
       });
+      micRef.current.pauseStream();
+      logUi("MIC_READY");
     } catch {
+      logUi("MIC_UNAVAILABLE");
       setWarning("Microphone unavailable.");
       setVisualState("error");
+      setState("error");
     }
   };
 
   const disconnect = async () => {
+    if (isPttActiveRef.current) {
+      logUi("PTT_END_ON_DISCONNECT");
+      markPttActive(false);
+      micRef.current?.pauseStream();
+      logUi("MIC_PAUSE");
+      socket.sendEvent({ type: "ptt_end" });
+    }
     if (speakingTimeoutRef.current !== null) {
       window.clearTimeout(speakingTimeoutRef.current);
       speakingTimeoutRef.current = null;
     }
-    isAssistantSpeakingRef.current = false;
-    loudMicChunkCountRef.current = 0;
+    micRef.current?.pauseStream();
+    logUi("MIC_PAUSE");
     micRef.current?.stop();
+    logUi("MIC_STOP");
     micRef.current = null;
     socket.disconnect();
     if (playerRef.current) {
       await playerRef.current.close();
       playerRef.current = null;
+      logUi("AUDIO_PLAYER_CLOSED");
     }
     setState("idle");
     setVisualState("idle");
   };
 
-  const toggleConnection = () => {
-    if (state === "idle" || state === "error") {
-      void connect();
-      return;
+  const beginPtt = () => {
+    if (state !== "ready" || isPttActiveRef.current) return;
+    pttSeqRef.current += 1;
+    logUi("PTT_BEGIN", { turn: pttSeqRef.current });
+    stopAssistantPlaybackNow();
+    markPttActive(true);
+    setVisualState("holding");
+    micRef.current?.startStream();
+    logUi("MIC_START");
+    socket.sendEvent({ type: "ptt_start" });
+  };
+
+  const endPtt = () => {
+    if (!isPttActiveRef.current) return;
+    logUi("PTT_END", { turn: pttSeqRef.current });
+    markPttActive(false);
+    micRef.current?.pauseStream();
+    logUi("MIC_PAUSE");
+    socket.sendEvent({ type: "ptt_end" });
+    if (state === "ready") {
+      setVisualState("awaiting");
     }
-    void disconnect();
   };
 
   const statusText =
     state === "connecting"
       ? "Connecting..."
-      : visualState === "speaking"
-        ? "Raksha is speaking"
-        : state === "ready"
-          ? "Listening"
-          : state === "error"
-            ? "Connection error"
-            : "Tap to start";
+      : state === "error"
+        ? "Connection error"
+        : state !== "ready"
+          ? "Start session"
+          : isPttActive
+            ? "Listening (hold active)"
+            : visualState === "speaking"
+              ? "Raksha is speaking"
+              : visualState === "awaiting"
+                ? "Awaiting response..."
+                : "Press and hold to speak";
+
+  const isSessionReady = state === "ready";
 
   return (
     <main className="app-shell">
@@ -168,16 +251,53 @@ export default function App() {
       <p className="app-subtitle">General health guidance only. Not diagnosis or emergency care.</p>
 
       <button
-        className={`orb orb-${visualState}`}
-        onClick={toggleConnection}
+        className="session-btn"
+        onClick={() => {
+          if (state === "idle" || state === "error") {
+            void connect();
+          } else {
+            void disconnect();
+          }
+        }}
         disabled={state === "connecting"}
-        aria-label={state === "idle" ? "Start Raksha voice assistant" : "Stop Raksha voice assistant"}
+      >
+        {state === "idle" || state === "error" ? "Start Session" : "End Session"}
+      </button>
+
+      <button
+        className={`orb orb-${visualState}`}
+        disabled={!isSessionReady}
+        aria-label="Hold to talk"
+        onPointerDown={(evt) => {
+          evt.currentTarget.setPointerCapture(evt.pointerId);
+          beginPtt();
+        }}
+        onPointerUp={endPtt}
+        onPointerCancel={endPtt}
+        onLostPointerCapture={endPtt}
+        onKeyDown={(evt) => {
+          if ((evt.key === " " || evt.key === "Enter") && !evt.repeat) {
+            evt.preventDefault();
+            beginPtt();
+          }
+        }}
+        onKeyUp={(evt) => {
+          if (evt.key === " " || evt.key === "Enter") {
+            evt.preventDefault();
+            endPtt();
+          }
+        }}
       >
         <span className="orb-core" />
       </button>
 
       <p className="status-text">{statusText}</p>
       {warning ? <p className="warning-text">{warning}</p> : null}
+
+      <div className="conversation-panels">
+        <DoctorRecommendations symptomsSummary={symptomsSummary} doctors={recommendedDoctors} />
+        <BookingUpdates updates={bookingUpdates} />
+      </div>
     </main>
   );
 }

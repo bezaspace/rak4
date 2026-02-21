@@ -1,0 +1,145 @@
+{
+  "timezone": "America/Los_Angeles",
+  "doctors": [
+    {
+      "doctorId": "dr_aisha_khan",
+      "name": "Dr. Aisha Khan",
+      "specialty": "Family Medicine",
+      "experienceYears": 11,
+      "languages": ["English", "Hindi"],
+      "focusAreas": ["cough", "fever", "fatigue", "sore throat", "seasonal flu"],
+      "slots": [
+        {
+          "slotId": "slot_ak_01",
+          "startIso": "2026-02-16T09:30:00-08:00",
+          "displayLabel": "Mon, Feb 16 - 9:30 AM",
+          "timezone": "America/Los_Angeles"
+        },
+        {
+          "slotId": "slot_ak_02",
+          "startIso": "2026-02-16T14:00:00-08:00",
+          "displayLabel": "Mon, Feb 16 - 2:00 PM",
+          "timezone": "America/Los_Angeles"
+        },
+        {
+          "slotId": "slot_ak_03",
+          "startIso": "2026-02-17T10:45:00-08:00",
+          "displayLabel": "Tue, Feb 17 - 10:45 AM",
+          "timezone": "America/Los_Angeles"
+        }
+      ]
+    },
+    {
+      "doctorId": "dr_daniel_ross",
+      "name": "Dr. Daniel Ross",
+      "specialty": "Internal Medicine",
+      "experienceYears": 14,
+      "languages": ["English", "Spanish"],
+      "focusAreas": ["stomach pain", "nausea", "blood pressure", "diabetes", "chest discomfort"],
+      "slots": [
+        {
+          "slotId": "slot_dr_01",
+          "startIso": "2026-02-16T11:00:00-08:00",
+          "displayLabel": "Mon, Feb 16 - 11:00 AM",
+          "timezone": "America/Los_Angeles"
+        },
+        {
+          "slotId": "slot_dr_02",
+          "startIso": "2026-02-17T15:30:00-08:00",
+          "displayLabel": "Tue, Feb 17 - 3:30 PM",
+          "timezone": "America/Los_Angeles"
+        },
+        {
+          "slotId": "slot_dr_03",
+          "startIso": "2026-02-18T09:15:00-08:00",
+          "displayLabel": "Wed, Feb 18 - 9:15 AM",
+          "timezone": "America/Los_Angeles"
+        }
+      ]
+    },
+    {
+      "doctorId": "dr_nina_patel",
+      "name": "Dr. Nina Patel",
+      "specialty": "Dermatology",
+      "experienceYears": 9,
+      "languages": ["English", "Gujarati"],
+      "focusAreas": ["rash", "acne", "itching", "hives", "skin irritation"],
+      "slots": [
+        {
+          "slotId": "slot_np_01",
+          "startIso": "2026-02-16T13:30:00-08:00",
+          "displayLabel": "Mon, Feb 16 - 1:30 PM",
+          "timezone": "America/Los_Angeles"
+        },
+        {
+          "slotId": "slot_np_02",
+          "startIso": "2026-02-17T09:00:00-08:00",
+          "displayLabel": "Tue, Feb 17 - 9:00 AM",
+          "timezone": "America/Los_Angeles"
+        },
+        {
+          "slotId": "slot_np_03",
+          "startIso": "2026-02-18T16:15:00-08:00",
+          "displayLabel": "Wed, Feb 18 - 4:15 PM",
+          "timezone": "America/Los_Angeles"
+        }
+      ]
+    },
+    {
+      "doctorId": "dr_olivia_chen",
+      "name": "Dr. Olivia Chen",
+      "specialty": "Pulmonology",
+      "experienceYears": 12,
+      "languages": ["English", "Mandarin"],
+      "focusAreas": ["wheezing", "persistent cough", "asthma", "breathing difficulty"],
+      "slots": [
+        {
+          "slotId": "slot_oc_01",
+          "startIso": "2026-02-16T10:15:00-08:00",
+          "displayLabel": "Mon, Feb 16 - 10:15 AM",
+          "timezone": "America/Los_Angeles"
+        },
+        {
+          "slotId": "slot_oc_02",
+          "startIso": "2026-02-17T14:45:00-08:00",
+          "displayLabel": "Tue, Feb 17 - 2:45 PM",
+          "timezone": "America/Los_Angeles"
+        },
+        {
+          "slotId": "slot_oc_03",
+          "startIso": "2026-02-18T12:00:00-08:00",
+          "displayLabel": "Wed, Feb 18 - 12:00 PM",
+          "timezone": "America/Los_Angeles"
+        }
+      ]
+    },
+    {
+      "doctorId": "dr_samuel_green",
+      "name": "Dr. Samuel Green",
+      "specialty": "Neurology",
+      "experienceYears": 16,
+      "languages": ["English"],
+      "focusAreas": ["migraine", "headache", "dizziness", "numbness", "sleep issues"],
+      "slots": [
+        {
+          "slotId": "slot_sg_01",
+          "startIso": "2026-02-16T16:00:00-08:00",
+          "displayLabel": "Mon, Feb 16 - 4:00 PM",
+          "timezone": "America/Los_Angeles"
+        },
+        {
+          "slotId": "slot_sg_02",
+          "startIso": "2026-02-17T11:30:00-08:00",
+          "displayLabel": "Tue, Feb 17 - 11:30 AM",
+          "timezone": "America/Los_Angeles"
+        },
+        {
+          "slotId": "slot_sg_03",
+          "startIso": "2026-02-18T14:00:00-08:00",
+          "displayLabel": "Wed, Feb 18 - 2:00 PM",
+          "timezone": "America/Los_Angeles"
+        }
+      ]
+    }
+  ]
+}

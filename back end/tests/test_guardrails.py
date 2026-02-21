@@ -1,10 +1,13 @@
-from app.agent import contains_urgent_risk_hint
+from app.agent import build_instruction
 
 
-def test_urgent_keywords_detected() -> None:
-    assert contains_urgent_risk_hint("I have crushing chest pain")
-    assert contains_urgent_risk_hint("My friend wants to kill myself")
+def test_instruction_includes_emergency_guidance() -> None:
+    instruction = build_instruction().lower()
+    assert "seek immediate emergency care" in instruction
+    assert "emergency services" in instruction
 
 
-def test_non_urgent_message_not_flagged() -> None:
-    assert not contains_urgent_risk_hint("I have mild headache after bad sleep")
+def test_instruction_preserves_non_diagnostic_safety() -> None:
+    instruction = build_instruction().lower()
+    assert "never diagnose" in instruction
+    assert "general wellness and self-care advice only" in instruction

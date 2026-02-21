@@ -1,6 +1,22 @@
 :root {
-  color: #eff7ff;
-  background: #04070d;
+  --bg: #121113;
+  --surface: #1a191c;
+  --surface-muted: #242226;
+  --surface-card: #2c282d;
+  --text: #e4dfd9;
+  --text-muted: #b8afae;
+  --accent: #5f8787;
+  --accent-strong: #9db7b7;
+  --peach: #fbcb97;
+  --apricot: #e78a53;
+  --stone: #999999;
+  --border: #3a3439;
+  --border-strong: #554c54;
+  --danger: #e78a53;
+
+  color: var(--text);
+  background: var(--bg);
+  color-scheme: dark;
   font-family: "Avenir Next", "Segoe UI", sans-serif;
 }
 
@@ -11,9 +27,8 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background:
-    radial-gradient(circle at 50% 30%, #1b2e5e 0%, rgba(8, 14, 35, 0.93) 42%, #03050a 100%),
-    linear-gradient(170deg, #070d1f 0%, #03060f 100%);
+  background: var(--bg);
+  color: var(--text);
 }
 
 #root {
@@ -25,9 +40,9 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 0.9rem;
-  padding: 1.5rem;
+  padding: 1.5rem 1.5rem 2.5rem 1.5rem;
   text-align: center;
 }
 
@@ -36,21 +51,45 @@ body {
   font-size: clamp(2rem, 4.5vw, 3rem);
   font-weight: 600;
   letter-spacing: 0.02em;
+  color: var(--text);
 }
 
 .app-subtitle {
   margin: 0 0 0.6rem 0;
-  color: rgba(232, 241, 255, 0.75);
+  color: var(--text-muted);
   max-width: 36rem;
   font-size: 0.95rem;
+}
+
+.session-btn {
+  border: 1px solid var(--accent-strong);
+  background: var(--accent);
+  color: #101a1a;
+  padding: 0.52rem 0.95rem;
+  border-radius: 999px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+
+.session-btn:hover {
+  background: var(--accent-strong);
+  color: #141414;
+  transform: translateY(-1px);
+}
+
+.session-btn:disabled {
+  opacity: 0.7;
+  cursor: wait;
+  transform: none;
 }
 
 .orb {
   width: min(62vw, 280px);
   aspect-ratio: 1;
-  border: none;
+  border: 2px solid var(--border-strong);
   border-radius: 999px;
-  background: transparent;
+  background: var(--surface-muted);
   position: relative;
   cursor: pointer;
   display: grid;
@@ -59,7 +98,8 @@ body {
 }
 
 .orb:disabled {
-  cursor: wait;
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .orb:hover {
@@ -70,10 +110,9 @@ body {
   width: 64%;
   height: 64%;
   border-radius: 999px;
-  background: radial-gradient(circle at 30% 30%, #f4fbff 0%, #8ac6ff 23%, #4768ff 62%, #2a2a6e 100%);
-  box-shadow:
-    0 0 22px rgba(122, 192, 255, 0.6),
-    0 0 76px rgba(86, 117, 255, 0.45);
+  background: var(--accent-strong);
+  border: 2px solid #474045;
+  box-shadow: 0 8px 20px rgba(95, 135, 135, 0.35);
 }
 
 .orb::before,
@@ -86,42 +125,189 @@ body {
 }
 
 .orb-idle::before {
-  background: radial-gradient(circle, rgba(99, 129, 230, 0.14), transparent 72%);
+  background: rgba(95, 135, 135, 0.15);
 }
 
 .orb-listening::before {
-  background: radial-gradient(circle, rgba(79, 198, 255, 0.38), rgba(87, 99, 255, 0.08) 60%, transparent 80%);
+  background: rgba(95, 135, 135, 0.3);
   animation: breathe 2.1s ease-in-out infinite;
 }
 
 .orb-speaking::before {
-  background: radial-gradient(circle, rgba(111, 238, 255, 0.56), rgba(120, 83, 255, 0.23) 52%, transparent 78%);
+  background: rgba(251, 203, 151, 0.55);
   animation: pulse-fast 0.58s ease-in-out infinite;
 }
 
 .orb-speaking::after {
   inset: -4%;
-  border: 2px solid rgba(116, 229, 255, 0.52);
+  border: 2px solid rgba(231, 138, 83, 0.5);
   animation: ring 1.3s ease-out infinite;
 }
 
+.orb-holding::before {
+  background: rgba(95, 135, 135, 0.5);
+  animation: pulse-fast 0.42s ease-in-out infinite;
+}
+
+.orb-awaiting::before {
+  background: rgba(153, 153, 153, 0.3);
+  animation: breathe 1.2s ease-in-out infinite;
+}
+
 .orb-error .orb-core {
-  background: radial-gradient(circle at 28% 28%, #ffd5d6 0%, #f37385 38%, #771024 100%);
-  box-shadow:
-    0 0 18px rgba(255, 116, 139, 0.65),
-    0 0 52px rgba(145, 17, 40, 0.4);
+  background: var(--apricot);
+  border-color: #714a37;
+  box-shadow: 0 8px 20px rgba(201, 103, 68, 0.35);
 }
 
 .status-text {
   margin: 0.15rem 0 0 0;
   font-size: 1rem;
-  color: rgba(236, 245, 255, 0.9);
+  color: var(--text);
 }
 
 .warning-text {
   margin: 0;
-  color: #ffd4a2;
+  color: #ffd8b3;
+  background: #3a2a22;
+  border: 1px solid #8a5b42;
+  border-radius: 10px;
   max-width: 32rem;
+  padding: 0.45rem 0.65rem;
+}
+
+.conversation-panels {
+  width: min(980px, 96vw);
+  display: grid;
+  gap: 0.9rem;
+  margin-top: 0.8rem;
+}
+
+.panel {
+  border-radius: 16px;
+  padding: 0.95rem;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 18px rgba(8, 8, 8, 0.34);
+}
+
+.panel-title {
+  margin: 0 0 0.3rem 0;
+  font-size: 1.04rem;
+}
+
+.panel-subtitle {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+}
+
+.doctor-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.65rem;
+  margin-top: 0.7rem;
+}
+
+.doctor-card {
+  border-radius: 12px;
+  background: var(--surface-card);
+  border: 1px solid var(--border);
+  padding: 0.78rem;
+}
+
+.doctor-header h3 {
+  margin: 0;
+  font-size: 0.96rem;
+}
+
+.doctor-header p {
+  margin: 0.2rem 0 0 0;
+  color: var(--text-muted);
+  font-size: 0.84rem;
+}
+
+.doctor-meta,
+.doctor-reason {
+  margin: 0.42rem 0 0 0;
+  font-size: 0.82rem;
+  color: #a89ea0;
+}
+
+.slots-title {
+  margin: 0.58rem 0 0.32rem 0;
+  font-size: 0.86rem;
+}
+
+.slot-list,
+.booking-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.slot-item {
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  border-radius: 8px;
+  padding: 0.48rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+}
+
+.slot-item-unavailable {
+  opacity: 0.56;
+  border-color: #7a4d3c;
+}
+
+.slot-item code {
+  font-size: 0.73rem;
+  background: var(--surface-muted);
+  color: #c0d4d4;
+  border-radius: 6px;
+  padding: 0.15rem 0.4rem;
+}
+
+.booking-item {
+  border-radius: 10px;
+  padding: 0.6rem;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+}
+
+.booking-item p {
+  margin: 0;
+  font-size: 0.84rem;
+}
+
+.booking-meta {
+  margin-top: 0.26rem !important;
+  color: var(--text-muted);
+}
+
+.booking-confirmed {
+  border-color: #5f8787;
+}
+
+.booking-failed,
+.booking-unavailable {
+  border-color: #b97353;
+}
+
+.booking-needs_confirmation {
+  border-color: #c9965f;
+}
+
+@media (max-width: 680px) {
+  .app-shell {
+    padding-top: 1.2rem;
+  }
 }
 
 @keyframes breathe {

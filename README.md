@@ -5,6 +5,14 @@ Raksha is a simple AI voice assistant for basic healthcare advice (non-diagnosti
 - Backend: Google ADK (Python) + FastAPI + uv
 - Frontend: React + Bun
 
+## Interaction Mode
+
+- Push-to-talk: press and hold to speak.
+- Release to end the turn and let the assistant respond.
+- Pressing while the assistant is speaking interrupts playback immediately.
+- Assistant output uses an AudioWorklet ring buffer at 24kHz for smoother voice playback.
+- Mic input is aggregated into 50ms PCM packets to reduce transport jitter.
+
 ## Folder Layout
 
 - `back end` - FastAPI websocket server and ADK live integration
