@@ -23,6 +23,13 @@ from app.agent import create_agent
 from app.booking_state import SessionBookingState
 from app.doctor_repository import DoctorRepository
 from app.doctor_tools import build_doctor_tools
+from app.patient_profile_service import PatientProfileService
+from app.patient_profile_service import ProfileContextResult
+from app.patient_tools import build_patient_tools
+from app.schedule_service import SCHEDULE_TIMEZONE_STATE_KEY
+from app.schedule_service import SCHEDULE_USER_ID_STATE_KEY
+from app.schedule_service import ScheduleService
+from app.schedule_tools import build_schedule_tools
 
 logger = logging.getLogger("raksha.live")
 
@@ -32,6 +39,7 @@ class LiveSessionContext:
     runner: Runner
     session: Any
     live_request_queue: LiveRequestQueue
+    profile_status_event: dict[str, Any]
 
 
 @dataclass
@@ -60,21 +68,45 @@ class TurnState:
 
 
 class LiveBridge:
-    def __init__(self, app_name: str, model: str, gemini_api_key: str) -> None:
+    def __init__(
+        self,
+        app_name: str,
+        model: str,
+        gemini_api_key: str,
+        patient_profile_service: PatientProfileService | None = None,
+        schedule_service: ScheduleService | None = None,
+    ) -> None:
         self._app_name = app_name
         self._model = model
         self._gemini_api_key = gemini_api_key
+        self._patient_profile_service = patient_profile_service
+        self._schedule_service = schedule_service
         self._session_service = InMemorySessionService()
         data_path = Path(__file__).resolve().parent / "data" / "mock_doctors.json"
         self._doctor_repository = DoctorRepository.from_json_file(data_path)
 
-    async def build_context(self, user_id: str) -> LiveSessionContext:
+    async def build_context(self, user_id: str, timezone_name: str | None = None) -> LiveSessionContext:
         os.environ["GOOGLE_API_KEY"] = self._gemini_api_key
         os.environ.setdefault("GOOGLE_GENAI_USE_VERTEXAI", "FALSE")
 
+        profile_context = self._load_profile_context(user_id)
         booking_state = SessionBookingState(self._doctor_repository.list_doctors())
-        tools = build_doctor_tools(self._doctor_repository, booking_state)
-        agent = create_agent(self._model, tools=tools)
+        state = {
+            **profile_context.state,
+            SCHEDULE_USER_ID_STATE_KEY: user_id,
+        }
+        if timezone_name and timezone_name.strip():
+            state[SCHEDULE_TIMEZONE_STATE_KEY] = timezone_name.strip()
+        tools = (
+            build_doctor_tools(self._doctor_repository, booking_state)
+            + build_patient_tools()
+            + build_schedule_tools(self._schedule_service)
+        )
+        agent = create_agent(
+            self._model,
+            tools=tools,
+            profile_summary=profile_context.profile_summary,
+        )
         runner = Runner(
             app_name=self._app_name,
             agent=agent,
@@ -83,11 +115,22 @@ class LiveBridge:
         session = await runner.session_service.create_session(
             app_name=self._app_name,
             user_id=user_id,
+            state=state,
         )
         queue = LiveRequestQueue()
-        return LiveSessionContext(runner=runner, session=session, live_request_queue=queue)
+        return LiveSessionContext(
+            runner=runner,
+            session=session,
+            live_request_queue=queue,
+            profile_status_event={
+                "type": "profile_status",
+                "loaded": profile_context.loaded,
+                "source": profile_context.source,
+                "message": profile_context.message,
+            },
+        )
 
-    async def run_websocket(self, websocket: WebSocket, user_id: str) -> None:
+    async def run_websocket(self, websocket: WebSocket, user_id: str, timezone_name: str | None = None) -> None:
         trace_id = uuid.uuid4().hex[:8]
         metrics = SessionMetrics(started_at=perf_counter())
         turn_state = TurnState()
@@ -98,7 +141,7 @@ class LiveBridge:
 
         try:
             while True:
-                context = await self.build_context(user_id=user_id)
+                context = await self.build_context(user_id=user_id, timezone_name=timezone_name)
                 logger.info(
                     "[%s] live_context_ready session_id=%s model=%s",
                     trace_id,
@@ -109,6 +152,14 @@ class LiveBridge:
                 await websocket.send_json({"type": "session_ready", "sessionId": context.session.id})
                 metrics.outgoing_text_events += 1
                 logger.info("[%s] tx_event type=session_ready session_id=%s", trace_id, context.session.id)
+                await websocket.send_json(context.profile_status_event)
+                metrics.outgoing_text_events += 1
+                logger.info(
+                    "[%s] tx_event type=profile_status loaded=%s source=%s",
+                    trace_id,
+                    context.profile_status_event.get("loaded"),
+                    context.profile_status_event.get("source"),
+                )
 
                 run_config = self._build_run_config()
                 logger.info("[%s] ptt_mode mode=strict aad_disabled=true", trace_id)
@@ -560,6 +611,22 @@ class LiveBridge:
             logger.exception("[%s] fallback_run_async_failed", trace_id, exc_info=exc)
             return False
 
+    def _load_profile_context(self, user_id: str) -> ProfileContextResult:
+        if self._patient_profile_service is None:
+            return ProfileContextResult(
+                state={
+                    "app:profile_available": False,
+                    "app:patient_profile": {},
+                    "app:biomarker_targets": [],
+                    "app:profile_summary": "",
+                },
+                profile_summary=None,
+                loaded=False,
+                source="none",
+                message="No profile service configured. Continuing with general guidance.",
+            )
+        return self._patient_profile_service.load_profile_context(user_id)
+
     @staticmethod
     def _get_function_responses(event: Any) -> list[Any]:
         getter = getattr(event, "get_function_responses", None)
@@ -603,7 +670,7 @@ class LiveBridge:
             return None
 
         payload_type = parsed.get("type")
-        if payload_type in {"doctor_recommendations", "booking_update"}:
+        if payload_type in {"doctor_recommendations", "booking_update", "schedule_snapshot", "adherence_report_saved"}:
             return parsed
         return None
 

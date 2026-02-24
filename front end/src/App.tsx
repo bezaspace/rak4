@@ -1,16 +1,27 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { NavLink, Route, Routes } from "react-router-dom";
 
 import { BookingUpdates, type BookingUpdate } from "./components/BookingUpdates";
 import { DoctorRecommendations } from "./components/DoctorRecommendations";
 import { startMicCapture, type AudioInputController } from "./lib/audioIn";
 import { AudioPlayer } from "./lib/audioOut";
-import { LiveSocket, type DoctorCard } from "./lib/liveSocket";
+import { LiveSocket, type AdherenceReportSavedEvent, type DoctorCard, type ServerEvent } from "./lib/liveSocket";
+import { SchedulePage } from "./pages/SchedulePage";
 
 type ConnectionState = "idle" | "connecting" | "ready" | "error";
 type VoiceVisualState = "idle" | "listening" | "holding" | "awaiting" | "speaking" | "error";
+type ScheduleSnapshotEvent = Extract<ServerEvent, { type: "schedule_snapshot" }>;
 
 const wsUrl = import.meta.env.VITE_BACKEND_WS_URL ?? "ws://localhost:8000/ws/live";
+const backendHttpUrl = import.meta.env.VITE_BACKEND_HTTP_URL ?? "http://localhost:8000";
 const appName = import.meta.env.VITE_APP_NAME ?? "Raksha";
+const defaultUserId = import.meta.env.VITE_USER_ID ?? "raksha-user";
+const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+
+const withSessionParams = (url: string, userId: string, timezone: string): string => {
+  const separator = url.includes("?") ? "&" : "?";
+  return `${url}${separator}user_id=${encodeURIComponent(userId)}&timezone=${encodeURIComponent(timezone)}`;
+};
 
 export default function App() {
   const [state, setState] = useState<ConnectionState>("idle");
@@ -20,6 +31,8 @@ export default function App() {
   const [recommendedDoctors, setRecommendedDoctors] = useState<DoctorCard[]>([]);
   const [bookingUpdates, setBookingUpdates] = useState<BookingUpdate[]>([]);
   const [isPttActive, setIsPttActive] = useState(false);
+  const [liveScheduleSnapshot, setLiveScheduleSnapshot] = useState<ScheduleSnapshotEvent | null>(null);
+  const [latestAdherenceEvent, setLatestAdherenceEvent] = useState<AdherenceReportSavedEvent | null>(null);
 
   const socket = useMemo(() => new LiveSocket(), []);
   const playerRef = useRef<AudioPlayer | null>(null);
@@ -71,10 +84,12 @@ export default function App() {
     setSymptomsSummary("");
     setRecommendedDoctors([]);
     setBookingUpdates([]);
+    setLiveScheduleSnapshot(null);
+    setLatestAdherenceEvent(null);
     markPttActive(false);
 
     playerRef.current = new AudioPlayer();
-    socket.connect(wsUrl, {
+    socket.connect(withSessionParams(wsUrl, defaultUserId, browserTimezone), {
       onOpen: () => {
         logUi("SESSION_READY");
         setState("ready");
@@ -100,6 +115,12 @@ export default function App() {
           setWarning("");
           if (!isPttActiveRef.current) {
             setListeningVisual();
+          }
+          return;
+        }
+        if (evt.type === "profile_status") {
+          if (!evt.loaded) {
+            setWarning(evt.message);
           }
           return;
         }
@@ -130,19 +151,34 @@ export default function App() {
         }
         if (evt.type === "assistant_audio_format") {
           assistantSampleRateRef.current = evt.sampleRate;
+          return;
         }
         if (evt.type === "assistant_interrupted") {
           stopAssistantPlaybackNow();
           if (!isPttActiveRef.current) {
             setVisualState("awaiting");
           }
+          return;
         }
         if (evt.type === "doctor_recommendations") {
           setSymptomsSummary(evt.symptomsSummary);
           setRecommendedDoctors(evt.doctors);
+          return;
         }
         if (evt.type === "booking_update") {
           setBookingUpdates((prev) => [...prev, { status: evt.status, message: evt.message, booking: evt.booking }]);
+          return;
+        }
+        if (evt.type === "schedule_snapshot") {
+          setLiveScheduleSnapshot(evt);
+          return;
+        }
+        if (evt.type === "adherence_report_saved") {
+          if (!evt.saved) {
+            setWarning(evt.message || "Could not save adherence report.");
+            return;
+          }
+          setLatestAdherenceEvent(evt);
         }
       },
       onAudioChunk: (chunk) => {
@@ -228,6 +264,80 @@ export default function App() {
     }
   };
 
+  return (
+    <main className="app-shell">
+      <h1 className="app-title">{appName}</h1>
+      <p className="app-subtitle">General health guidance only. Not diagnosis or emergency care.</p>
+
+      <nav className="top-nav">
+        <NavLink to="/" className={({ isActive }) => (isActive ? "nav-link nav-link-active" : "nav-link")}>
+          Voice
+        </NavLink>
+        <NavLink to="/schedule" className={({ isActive }) => (isActive ? "nav-link nav-link-active" : "nav-link")}>
+          Schedule
+        </NavLink>
+      </nav>
+
+      <Routes>
+        <Route
+          path="/"
+          element={
+            <VoiceSessionPage
+              state={state}
+              visualState={visualState}
+              warning={warning}
+              symptomsSummary={symptomsSummary}
+              recommendedDoctors={recommendedDoctors}
+              bookingUpdates={bookingUpdates}
+              isPttActive={isPttActive}
+              onConnect={connect}
+              onDisconnect={disconnect}
+              onBeginPtt={beginPtt}
+              onEndPtt={endPtt}
+            />
+          }
+        />
+        <Route
+          path="/schedule"
+          element={
+            <SchedulePage
+              backendHttpUrl={backendHttpUrl}
+              userId={defaultUserId}
+              liveSnapshot={liveScheduleSnapshot}
+              liveReportUpdate={latestAdherenceEvent}
+            />
+          }
+        />
+      </Routes>
+    </main>
+  );
+}
+
+function VoiceSessionPage({
+  state,
+  visualState,
+  warning,
+  symptomsSummary,
+  recommendedDoctors,
+  bookingUpdates,
+  isPttActive,
+  onConnect,
+  onDisconnect,
+  onBeginPtt,
+  onEndPtt,
+}: {
+  state: ConnectionState;
+  visualState: VoiceVisualState;
+  warning: string;
+  symptomsSummary: string;
+  recommendedDoctors: DoctorCard[];
+  bookingUpdates: BookingUpdate[];
+  isPttActive: boolean;
+  onConnect: () => Promise<void>;
+  onDisconnect: () => Promise<void>;
+  onBeginPtt: () => void;
+  onEndPtt: () => void;
+}) {
   const statusText =
     state === "connecting"
       ? "Connecting..."
@@ -242,21 +352,17 @@ export default function App() {
               : visualState === "awaiting"
                 ? "Awaiting response..."
                 : "Press and hold to speak";
-
   const isSessionReady = state === "ready";
 
   return (
-    <main className="app-shell">
-      <h1 className="app-title">{appName}</h1>
-      <p className="app-subtitle">General health guidance only. Not diagnosis or emergency care.</p>
-
+    <>
       <button
         className="session-btn"
         onClick={() => {
           if (state === "idle" || state === "error") {
-            void connect();
+            void onConnect();
           } else {
-            void disconnect();
+            void onDisconnect();
           }
         }}
         disabled={state === "connecting"}
@@ -270,21 +376,21 @@ export default function App() {
         aria-label="Hold to talk"
         onPointerDown={(evt) => {
           evt.currentTarget.setPointerCapture(evt.pointerId);
-          beginPtt();
+          onBeginPtt();
         }}
-        onPointerUp={endPtt}
-        onPointerCancel={endPtt}
-        onLostPointerCapture={endPtt}
+        onPointerUp={onEndPtt}
+        onPointerCancel={onEndPtt}
+        onLostPointerCapture={onEndPtt}
         onKeyDown={(evt) => {
           if ((evt.key === " " || evt.key === "Enter") && !evt.repeat) {
             evt.preventDefault();
-            beginPtt();
+            onBeginPtt();
           }
         }}
         onKeyUp={(evt) => {
           if (evt.key === " " || evt.key === "Enter") {
             evt.preventDefault();
-            endPtt();
+            onEndPtt();
           }
         }}
       >
@@ -298,6 +404,6 @@ export default function App() {
         <DoctorRecommendations symptomsSummary={symptomsSummary} doctors={recommendedDoctors} />
         <BookingUpdates updates={bookingUpdates} />
       </div>
-    </main>
+    </>
   );
 }

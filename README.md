@@ -4,6 +4,7 @@ Raksha is a simple AI voice assistant for basic healthcare advice (non-diagnosti
 
 - Backend: Google ADK (Python) + FastAPI + uv
 - Frontend: React + Bun
+- Per-user profile grounding: persisted SQLite patient history + biomarker targets
 
 ## Interaction Mode
 
@@ -39,6 +40,10 @@ Update API key in `back end/.env`:
 ```env
 GEMINI_API_KEY=YOUR_GEMINI_API_KEY_HERE
 GEMINI_MODEL=gemini-2.5-flash-native-audio-preview-12-2025
+PROFILE_DB_URL=sqlite:///app/data/patient_profiles.db
+PROFILE_SEED_SQL_PATH=app/data/patient_profiles.sql
+SCHEDULE_DB_URL=sqlite:///app/data/patient_profiles.db
+SCHEDULE_SEED_SQL_PATH=app/data/schedules.sql
 ```
 
 Run backend:
@@ -56,6 +61,23 @@ bun run dev
 ```
 
 Open the local Vite URL (usually `http://localhost:5173`).
+
+Optional frontend env:
+
+```env
+VITE_USER_ID=raksha-user
+VITE_BACKEND_HTTP_URL=http://localhost:8000
+```
+
+## Schedule + Adherence (V1)
+
+- New page at `/schedule` shows today's schedule and adherence timeline.
+- Backend API:
+  - `GET /api/schedule/today?user_id=...&timezone=...&date=YYYY-MM-DD`
+  - `GET /api/schedule/items/{schedule_item_id}/reports?user_id=...&timezone=...&date=YYYY-MM-DD`
+- Websocket now accepts optional `timezone` query param and emits:
+  - `schedule_snapshot`
+  - `adherence_report_saved`
 
 ## Safety Behavior
 

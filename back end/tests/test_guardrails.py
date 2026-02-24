@@ -11,3 +11,8 @@ def test_instruction_preserves_non_diagnostic_safety() -> None:
     instruction = build_instruction().lower()
     assert "never diagnose" in instruction
     assert "general wellness and self-care advice only" in instruction
+
+
+def test_instruction_requires_true_save_before_logging_confirmation() -> None:
+    instruction = build_instruction().lower()
+    assert "only tell the user that adherence was logged if save_adherence_report returns saved=true" in instruction

@@ -27,12 +27,99 @@ export type BookingCard = {
   createdAtIso: string;
 };
 
+export type ScheduleItemLatestReport = {
+  reportId: string;
+  status: "done" | "partial" | "skipped" | "delayed";
+  alertLevel: "none" | "watch" | "urgent";
+  summary: string;
+  reportedAtIso: string;
+};
+
+export type ScheduleItemCard = {
+  scheduleItemId: string;
+  activityType: "diet" | "medication" | "sleep" | "activity";
+  title: string;
+  instructions: string[];
+  windowStartLocal: string;
+  windowEndLocal: string;
+  displayOrder: number;
+  latestReport: ScheduleItemLatestReport | null;
+};
+
+export type ScheduleTimelineEntry = {
+  reportId: string;
+  scheduleItemId: string;
+  activityType: "diet" | "medication" | "sleep" | "activity";
+  status: "done" | "partial" | "skipped" | "delayed";
+  followedPlan: boolean;
+  changesMade: string | null;
+  feltAfter: string | null;
+  symptoms: string | null;
+  notes: string | null;
+  alertLevel: "none" | "watch" | "urgent";
+  summary: string;
+  reportedAtIso: string;
+  createdAt: string;
+  conversationTurnId: string | null;
+  sessionId: string | null;
+};
+
+export type ScheduleSnapshotPayload = {
+  date: string;
+  timezone: string;
+  items: ScheduleItemCard[];
+  timeline: ScheduleTimelineEntry[];
+  message?: string;
+};
+
+export type AdherenceSaveReasonCode =
+  | "invalid_item_id"
+  | "invalid_status"
+  | "invalid_alert"
+  | "date_mismatch"
+  | "unknown";
+
+export type AdherenceReportSavedSuccessEvent = {
+  type: "adherence_report_saved";
+  saved: true;
+  deduped?: boolean;
+  reasonCode?: null;
+  reportId: string;
+  scheduleItemId: string;
+  date: string;
+  activityType: "diet" | "medication" | "sleep" | "activity";
+  status: "done" | "partial" | "skipped" | "delayed";
+  alertLevel: "none" | "watch" | "urgent";
+  summary: string;
+  reportedAtIso: string;
+  createdAt: string;
+  followedPlan?: boolean;
+  changesMade?: string | null;
+  feltAfter?: string | null;
+  symptoms?: string | null;
+  notes?: string | null;
+  conversationTurnId?: string | null;
+  sessionId?: string | null;
+  resolvedScheduleItemId?: string;
+  message: string;
+};
+
+export type AdherenceReportSavedFailureEvent = {
+  type: "adherence_report_saved";
+  saved: false;
+  reasonCode?: AdherenceSaveReasonCode;
+  message: string;
+};
+
+export type AdherenceReportSavedEvent = AdherenceReportSavedSuccessEvent | AdherenceReportSavedFailureEvent;
+
 export type ServerEvent =
   | { type: "session_ready"; sessionId: string }
   | { type: "partial_transcript"; text: string }
   | { type: "assistant_text"; text: string }
   | { type: "assistant_audio_format"; sampleRate: number }
   | { type: "assistant_interrupted" }
+  | { type: "profile_status"; loaded: boolean; source: "db" | "none"; message: string }
   | { type: "warning"; message: string }
   | { type: "fallback_started"; reason: string; turnId: string }
   | { type: "fallback_completed"; turnId: string; result: "ok" | "failed" }
@@ -49,7 +136,9 @@ export type ServerEvent =
       status: "confirmed" | "failed" | "unavailable" | "needs_confirmation";
       booking?: BookingCard;
       message: string;
-    };
+    }
+  | ({ type: "schedule_snapshot" } & ScheduleSnapshotPayload)
+  | AdherenceReportSavedEvent;
 
 export type LiveSocketHandlers = {
   onOpen?: () => void;

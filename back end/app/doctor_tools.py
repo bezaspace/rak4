@@ -3,13 +3,52 @@ from __future__ import annotations
 from typing import Any, Callable
 from uuid import uuid4
 
+from google.adk.tools import ToolContext
+
 from app.booking_state import SessionBookingState
 from app.doctor_repository import DoctorRepository
+from app.patient_profile_service import BIOMARKER_TARGETS_STATE_KEY
+from app.patient_profile_service import PATIENT_PROFILE_STATE_KEY
 
 
 def build_doctor_tools(
     doctor_repository: DoctorRepository, booking_state: SessionBookingState
 ) -> list[Callable[..., dict[str, Any]]]:
+    def _extract_profile_context(tool_context: ToolContext | None) -> tuple[list[str], list[str]]:
+        if tool_context is None:
+            return [], []
+
+        raw_targets = tool_context.state.get(BIOMARKER_TARGETS_STATE_KEY, [])
+        raw_profile = tool_context.state.get(PATIENT_PROFILE_STATE_KEY, {})
+        if not isinstance(raw_targets, list):
+            raw_targets = []
+        if not isinstance(raw_profile, dict):
+            raw_profile = {}
+
+        biomarker_labels: list[str] = []
+        for target in raw_targets:
+            if not isinstance(target, dict):
+                continue
+            biomarker = str(target.get("biomarker", "")).strip()
+            target_value = str(target.get("target", "")).strip()
+            unit = str(target.get("unit", "")).strip()
+            if not biomarker:
+                continue
+            label = biomarker
+            if target_value:
+                label = f"{label} ({target_value}{f' {unit}' if unit else ''})"
+            biomarker_labels.append(label)
+
+        conditions: list[str] = []
+        for condition in raw_profile.get("conditions", []) or []:
+            if not isinstance(condition, dict):
+                continue
+            name = str(condition.get("name", "")).strip()
+            if name:
+                conditions.append(name)
+
+        return biomarker_labels[:3], conditions[:2]
+
     def get_doctor_catalog() -> dict[str, Any]:
         """
         Fetches doctors and current slot availability for this conversation.
@@ -22,12 +61,17 @@ def build_doctor_tools(
             "doctors": doctors,
         }
 
-    def publish_recommendations(symptoms_summary: str, doctor_ids: list[str]) -> dict[str, Any]:
+    def publish_recommendations(
+        symptoms_summary: str,
+        doctor_ids: list[str],
+        tool_context: ToolContext | None = None,
+    ) -> dict[str, Any]:
         """
         Publishes exactly 2-3 doctor recommendations to the chat UI.
         Use doctor_ids that come from get_doctor_catalog.
         """
         summary = str(symptoms_summary).strip()
+        biomarker_targets, conditions = _extract_profile_context(tool_context)
         selected_ids = [str(doctor_id).strip() for doctor_id in doctor_ids if str(doctor_id).strip()]
         unique_ids = list(dict.fromkeys(selected_ids))
         if len(unique_ids) < 2 or len(unique_ids) > 3:
@@ -48,6 +92,13 @@ def build_doctor_tools(
 
             doctor = doctor_repository.get_doctor(doctor_id)
             doctor_with_availability = booking_state.with_availability([doctor])[0]
+            reason_parts = [
+                f"Potential fit based on your symptoms: {summary or 'current concerns'}.",
+            ]
+            if biomarker_targets:
+                reason_parts.append(f"Aligned with biomarker goals: {', '.join(biomarker_targets)}.")
+            if conditions:
+                reason_parts.append(f"Considers your history of {', '.join(conditions)}.")
             doctors.append(
                 {
                     "doctorId": doctor_with_availability["doctorId"],
@@ -55,9 +106,7 @@ def build_doctor_tools(
                     "specialty": doctor_with_availability["specialty"],
                     "experienceYears": doctor_with_availability["experienceYears"],
                     "languages": doctor_with_availability.get("languages", []),
-                    "matchReason": (
-                        f"Potential fit based on your symptoms: {summary or 'current concerns'}."
-                    ),
+                    "matchReason": " ".join(reason_parts),
                     "slots": doctor_with_availability["slots"],
                 }
             )

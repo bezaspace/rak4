@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     port: int = 8000
     frontend_origin: str = "http://localhost:5173"
     log_level: str = "info"
+    profile_db_url: str = "sqlite:///app/data/patient_profiles.db"
+    profile_seed_sql_path: str = "app/data/patient_profiles.sql"
+    schedule_db_url: str = "sqlite:///app/data/patient_profiles.db"
+    schedule_seed_sql_path: str = "app/data/schedules.sql"
 
     @field_validator("gemini_model")
     @classmethod
